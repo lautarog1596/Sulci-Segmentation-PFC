@@ -1,0 +1,49 @@
+# path to the checkpoint file containing the model
+model_path: "checkpoints/best_checkpoint.pytorch"
+#device : 'cpu'
+
+loaders:
+  # direccion base en donde estan todas las carpetas
+  test_path : '/home/lgianinetto/lau/HCP_datos/Antonia/'
+  in_image: 'T1w_restore_brain_normZscores.nii.gz'
+  gt_image: 'T1w_restore_brain_normZscores.nii.gz' # para predecir no se usa esto, se puede pasar cualquier imagen siempre que exista
+  reg : 'MNINonLinear' # T1w o MNINonLinear
+  save_pred_as_nifty : True
+  name_nifty_img : 'pred_M26_whole_2.nii.gz'
+  save_pred_as_slice : False
+  # path to the directory where the predictions from the network will be saved (optional: if not provided the TEST_SET directory will be used)
+  output_dir: "/home/lgianinetto/lau/HCP_datos/Antonia/"
+  whole_image : True # if it is True, it trains with the whole image and the following parameters are without effect
+  resize_input_unet : [256, 304, 256] # para que se ajuste la imagen en la unet
+
+  # no se usan todos los cpu xq se tilda la pc. (batch_size = batch_size * n_workers)
+  n_workers: 1
+  # no afecta tiempo entrenamiento, si memoria gpu. (batch_size = batch_size * n_workers)
+  batch_size: 1 # si se infiere toda la imagen, batch_size = 1
+  # Small result in loss of contextual information whereas large tamper with the localization results. No afecta tiempo entrenam, si mem gpu
+  patch_size : 128
+  # uple of even integers (𝑑𝑜,ℎ𝑜,𝑤𝑜) specifying the overlap between patches for dense inference. If a single number 𝑛 is provided, 𝑑𝑜=ℎ𝑜=𝑤𝑜=𝑛.
+  patch_overlap : 0
+
+# model configuration
+model:
+  in_channels : 1
+  out_classes : 26  # clases binarias
+  dimensions : 3
+  num_encoding_blocks : 5 # contando el block del fondo!!!!
+  out_channels_first_layer : 6  # 64
+  normalization : 'batch'
+  pooling_type : 'max'
+  upsampling_type : 'conv'
+  preactivation : False # no lo uso
+  residual : False # no lo uso
+  padding : 1 # para conservar tamaño de la imagen, sino max_pooling la achica
+  padding_mode : 'replicate'
+  activation : 'ReLU'
+  #  initial_dilation : 1 # no lo uso
+#  dropout : 0.1 # no lo uso
+  dropout : 0 # no lo uso
+  monte_carlo_dropout : 0 # no lo uso
+
+
+

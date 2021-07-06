@@ -1,0 +1,124 @@
+# use a fixed random seed to guarantee that when you run the code twice you will get the same outcome
+manual_seed: 1
+
+logs:
+  logger_dir : 'loggers'
+
+loaders:
+  # directories where all the HCP folders are
+  train_path: '/home/lgianinetto/lau/HCP_datos/Train/'
+  val_path: '/home/lgianinetto/lau/HCP_datos/Val/'
+  # input image name and its graound truth
+  reg : 'MNINonLinear'
+  in_image : 'T1w_restore_brain_normZscores.nii.gz'
+  gt_image : 'bin_sul+sul_lbl_fus_geod_prop_remove_1.2_60.nii.gz'
+  # if True, it applies: RandomFlip and RandomRotation (see in dataloaders.py)
+  data_augment : True # rotations only, flip removed
+  # n_workers must be tested according to the batch_size, it is not necessary that there be many because otherwise RAM
+  # is wasted and can even slow down. The idea is that in the main process the fordware and backward are done, while in
+  # the rest of the workers prepare the batches so that they are ready for when the main process finishes. The workers
+  # keep the queue ready with the batches, if these are small, maybe with few workers is enough
+  n_workers : 4 # 4 workers is optimal for my 6-core and 12-logic pc
+  batch_size : 3 # adjust to saturate GPU
+  whole_image : False # if it is True, it trains with the whole image and the following parameters are without effect
+  resize_input_unet : [256, 304, 256]
+  #resize_input_unet : [208, 240, 208]
+
+  # Small result in loss of contextual information whereas large tamper with the localization results.
+  patch_size : 128
+  # Number of patches to extract from each volume (parches por cada sujeto)
+  # Small number of patches ensures a large variability in the queue, but training will be slower.
+  samples_per_volume : 8
+  # Maximum number of patches that can be stored in the queue.
+  # Using a large number means that the queue needs to be filled less often, but more CPU memory is needed to store the patches.
+  max_queue_length : 8 # usar igual que samples_per_volume, xq sino demora más tiempo
+#  sampler : WeightedSampler # UniformSampler, WeightedSampler, LabelSampler
+#  label_probabilities : {0: 0, 1: 2}
+  label_probabilities : {0: 0, 1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 
+                        15: 1, 16: 1, 17: 1, 18: 1, 19: 1, 20: 1, 21: 1, 22: 1, 23: 1, 24: 1, 25: 1}
+
+# Examples of the above parameters (train with patches):
+# 1- If samples_per_volume is 1 and there are 6 subjects/vol, 1 patch will be taken per subject/vol leaving 6 total patches
+# Since batch_size is 1, int(6/1) times will be iterated to process the 6 patches and complete an epoch
+# 2- If samples_per_volume is 1 and there are 6 subjects/vol, 1 patch will be taken per subject/vol leaving 6 total patches
+# Since batch_size is 2, int(6/2) times will be iterated to process the 6 patches and complete an epoch
+# 3- If samples_per_volume is 2 and there are 6 subjects/vol, 2 patches will be taken per subject/vol leaving 12 total patches
+# Since batch_size is 1, int(12/1) times will be iterated to process the 12 patches and complete an epoch
+# 4- If samples_per_volume is 2 and there are 6 subjects/vol, 2 patches will be taken per subject/vol leaving 12 total patches
+# Since batch_size is 2, int(12/2) times will be iterated to process the 12 patches and complete an epoch
+
+trainer:
+  # path to the checkpoint directory
+  checkpoint_dir: "checkpoints"
+  # path to latest checkpoint; if provided the training will be resumed from that checkpoint
+  # resume: "checkpoints/last_checkpoint.pytorch"
+  eval_score_higher_is_better: True   # model with higher eval score is considered better
+  val_log_after_epoch : True    # If True, it is validated and logs are saved at the end of each epoch and the following 2 parameters have no effect
+  validate_after_iters: 1000    # how many iterations between validations.
+  log_after_iters: 1000         # how many iterations between tensorboard logging
+  epochs: 1000      # max number of epochs
+  iters: 1000000    # max number of iterations
+
+model:
+  in_channels : 1
+  out_classes : 26  # 2 if it is background or foreground .. 3 or more if there are several classes
+  dimensions : 3
+  num_encoding_blocks : 5 # counting the bottom block !!!!
+  out_channels_first_layer : 6
+  normalization : 'batch'
+  pooling_type : 'max'
+  upsampling_type : 'conv'
+  preactivation : False # ---
+  residual : False # ---
+  padding : 1 # to conserve image size, otherwise max_pooling makes it smaller
+  padding_mode : 'replicate'
+  activation : 'ReLU'
+#  initial_dilation : 1 # dilated convolution... the first block uses non-dilated convolutions, the following are multiplied by 2
+  #dropout : 0.3
+  dropout : 0
+  monte_carlo_dropout : 0 # ---
+
+
+optimizer:      # https://arxiv.org/pdf/1711.05101.pdf
+  optimizer : AdamW  # AdamW or SGD
+  learning_rate : 1e-4   # initial learning rate. Default AdamW
+  weight_decay : 1e-2    # weight decay. Default AdamW
+  momentum : 0  # if SGD is used
+
+
+lr_scheduler:
+#  name: MultiStepLR
+#  milestones: [10, 30, 60]
+#  gamma: 0.1
+  name : ReduceLROnPlateau
+  # In min mode, lr will be reduced when the quantity monitored has stopped decreasing;
+  # in max mode it will be reduced when the quantity monitored has stopped increasing.
+  mode : max
+  # Factor by which the learning rate will be reduced. new_lr = lr * factor. Default: 0.1.
+  factor : 0.1
+  threshold : 1e-3
+  # Number of epochs with no improvement after which learning rate will be reduced.
+  # For example, if patience = 2, then we will ignore the first 2 epochs with no improvement,
+  # and will only decrease the LR after the 3rd epoch if the loss still hasn’t improved then. Default: 10.
+  patience : 10
+  # If True, prints a message to stdout for each update. Default: False.
+  verbose : True
+
+
+loss:
+#  name: DiceLoss      # loss function to be used during training
+  name: DiceLoss      # loss function to be used during training
+  weight: null        # A manual rescaling weight given to each class.
+#  weight: [0.00190405, 0.0193518, 0.5914962, 0.22399348, 0.3538503, 0.23231803,
+#           1., 0.46419623, 0.21253781, 0.34094164, 0.20390074, 0.73677063 ] # A manual rescaling weight given to each class.
+  ignore_index: null  # a target value that is ignored and does not contribute to the input gradient
+  # si sigmoid_normalization es False, se aplica SoftMax a las salidas logit del modelo para luego computar loss
+  # Use sigmoid for binary segmentation and softmax for multiclass
+  sigmoid_normalization: False
+
+
+eval_metric:
+  name: MeanIoU
+  ignore_index: null  # a target label that is ignored during metric evaluation
+
+
